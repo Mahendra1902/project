@@ -7,3 +7,4 @@ langchain-google-genai
 google-generativeai
 sentence-transformers
 transformers
+langchain community
