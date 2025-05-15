@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+langchain>=0.1.13
+faiss-cpu
+langchain-google-genai
+google-generativeai
+sentence-transformers
+transformers

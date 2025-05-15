@@ -1,0 +1,3 @@
+Date: 2023-12-6
+Incident: Sample incident 2 occurred at location XYZ
+Resolution: Sample resolution for incident 2 completed.

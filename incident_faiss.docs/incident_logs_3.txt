@@ -1,0 +1,11 @@
+Date: 2023-11-10
+Incident: Forklift operator without seatbelt in Warehouse
+Resolution: Suspension and mandatory retraining.
+
+Date: 2023-11-28
+Incident: Blocked emergency exit in Assembly Line
+Resolution: Cleared path and added regular inspection routine.
+
+Date: 2023-12-04
+Incident: Broken safety railing near Reactor
+Resolution: Repaired railing and reviewed safety inspection logs.

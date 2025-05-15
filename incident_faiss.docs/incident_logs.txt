@@ -1,0 +1,11 @@
+Date: 2023-06-14
+Incident: Helmet violation near Furnace 3
+Resolution: Issued safety warning and conducted retraining.
+
+Date: 2023-07-01
+Incident: Gas leak in Boiler Room
+Resolution: Evacuation and system maintenance completed.
+
+Date: 2023-08-10
+Incident: Noise levels exceeded in Assembly Line
+Resolution: Provided ear protection and installed noise dampeners.
