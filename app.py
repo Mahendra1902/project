@@ -3,51 +3,73 @@ import pandas as pd
 import numpy as np
 import datetime
 import os
+from glob import glob
+import pickle
+import faiss
 
-from langchain.vectorstores import FAISS
+from langchain.vectorstores.faiss import FAISS as LangchainFAISS
+from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
+from langchain.schema import Document
+from sentence_transformers import SentenceTransformer
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.embeddings import HuggingFaceEmbeddings
 
 # Set Gemini API Key
-os.environ["GOOGLE_API_KEY"] = "AIzaSyBmUYQdImYbjPJesYFoMHVEfibp5l1CKBc"  # Replace with your Gemini API key
+os.environ["GOOGLE_API_KEY"] = "AIzaSyBmUYQdImYbjPJesYFoMHVEfibp5l1CKBc"  # Replace with your API key
 
-# Initialize LLM and vector database using Gemini and local embeddings with FAISS persistence
-from glob import glob
-import os
-
-# Initialize LLM and vector database using Gemini and local embeddings with FAISS persistence
+# ---------- Initialize RAG ----------
 def initialize_rag():
     db_path = "faiss_index"
-    
-    # Load all incident logs from the current directory
-    incident_files = glob("*.txt")  # This loads all .txt files in the directory
+    custom_index_path = "incident_faiss.index"
+    custom_logs_path = "incident_logs.pkl"
+
+    # Load and split .txt documents
+    incident_files = glob("*.txt")
     all_documents = []
-    
     for file in incident_files:
         loader = TextLoader(file)
-        all_documents.extend(loader.load())  # Load documents from all .txt files
+        all_documents.extend(loader.load())
 
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    split_documents = text_splitter.split_documents(all_documents)
 
-    # Check if FAISS index exists
-    if os.path.exists(db_path):
-        vector_store = FAISS.load_local(db_path, embeddings, allow_dangerous_deserialization=True)
-    else:
-        text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        texts = text_splitter.split_documents(all_documents)
-        vector_store = FAISS.from_documents(texts, embeddings)
-        vector_store.save_local(db_path)
+    # LangChain embeddings
+    lc_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-    retriever = vector_store.as_retriever()
+    # Build FAISS from .txt documents
+    langchain_store = LangchainFAISS.from_documents(split_documents, lc_embeddings)
+
+    # Load custom FAISS index
+    if os.path.exists(custom_index_path) and os.path.exists(custom_logs_path):
+        with open(custom_logs_path, "rb") as f:
+            custom_logs = pickle.load(f)
+
+        custom_docs = [Document(page_content=log) for log in custom_logs]
+        embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        custom_embeddings = embedding_model.encode(custom_logs)
+
+        raw_index = faiss.read_index(custom_index_path)
+
+        custom_store = LangchainFAISS(embedding_function=lc_embeddings, index=raw_index, docstore=dict(), index_to_docstore_id={})
+        for i, doc in enumerate(custom_docs):
+            doc_id = str(i)
+            custom_store.docstore[doc_id] = doc
+            custom_store.index_to_docstore_id[i] = doc_id
+
+        langchain_store.merge_from(custom_store)
+
+    # Save merged index
+    langchain_store.save_local(db_path)
+
+    # Create RAG chain
+    retriever = langchain_store.as_retriever()
     llm = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash", temperature=0.3)
-    
     qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
     return qa_chain
 
-# Dummy functions to simulate agent behavior
+# ---------- Simulated Agent Functions ----------
 def analyze_video_feed():
     return ["No helmet detected near Furnace 3", "Unauthorized entry detected in Zone B"]
 
@@ -67,20 +89,19 @@ def generate_prevention_checklist():
 def generate_compliance_report():
     return "Safety compliance is at 92% this month. Helmet violations decreased by 15%."
 
-# Initialize RAG system
-qa_chain = initialize_rag()
-
 def retrieve_similar_incidents(query="helmet violation near furnace"):
-    result = qa_chain.run(query)
-    return [result]
+    return [qa_chain.run(query)]
 
-# Streamlit UI
+# ---------- App UI ----------
 st.set_page_config(page_title="AI-Powered Safety Monitoring", layout="wide")
 st.title("AI-Powered Industrial Safety Monitoring")
 
 st.sidebar.header("Control Panel")
 shift_start = st.sidebar.time_input("Shift Start Time", value=datetime.time(8, 0))
 selected_area = st.sidebar.selectbox("Select Area", ["Furnace", "Boiler Room", "Assembly Line"])
+
+# Load QA chain
+qa_chain = initialize_rag()
 
 st.header("Real-time Hazard Alerts")
 video_alerts = analyze_video_feed()
@@ -106,7 +127,7 @@ if user_query:
     rag_results = retrieve_similar_incidents(user_query)
     for res in rag_results:
         st.write("-", res)
-#header
+
 st.header("Safety Compliance Report")
 report = generate_compliance_report()
 st.info(report)
