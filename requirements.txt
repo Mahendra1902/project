@@ -8,3 +8,4 @@ google-generativeai
 sentence-transformers
 transformers
 langchain community
+--upgrade pip
